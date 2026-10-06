@@ -28,14 +28,21 @@ firmware automatycznie odtwarza wiadomość z głośnika. Bez zmian w protobufac
 - ❌ **T-Deck z SX1280 (2,4 GHz)** — ten build zakłada SX1262 sub-GHz
 
 ### Który plik wgrać
-| Plik | Kiedy | Offset |
-|---|---|---|
-| `t-deck-audio-full-2.8.2.50fc7c1.bin` | pierwsze wgranie / pełny obraz (bootloader + partycje + aplikacja) | `0x0` |
-| `t-deck-audio-update-2.8.2.50fc7c1.bin` | aktualizacja działającego węzła (sama aplikacja) | `0x10000` |
+**To build ALFA — zawsze wgraj plik `full`** (zawiera bootloader + partycje + aplikację, offset `0x0`).
+
+| Plik | Offset |
+|---|---|
+| `t-deck-audio-full-2.8.2.50fc7c1.bin` | `0x0` |
 
 "full" to ta sama zawartość, którą PlatformIO nazywa `factory.bin` — **to NIE
 znaczy "ustawienia fabryczne"**: plik nie rusza NVS (klucze, region, kanały,
 nazwa węzła zostają nietknięte).
+
+> 💾 **PRZED wgraniem zrób backup konfiguracji!** W aplikacji Meshtastic:
+> eksport/udostępnij konfigurację urządzenia (Ustawienia → Export / Share
+> configuration), a z CLI: `meshtastic --export-config config.yaml`. Zapisz
+> ten plik — gdyby cokolwiek poszło nie tak, odbudujesz węzeł (klucze, kanały,
+> region) w minutę, nawet po pełnym resetzie.
 
 ### Instalacja — web flasher
 1. Podłącz T-Deck kablem USB-C **do transmisji danych**.
@@ -44,7 +51,7 @@ nazwa węzła zostają nietknięte).
    ("Advanced / specify firmware URL" lub wybór pliku z dysku).
 4. Wskaż `t-deck-audio-full-2.8.2.50fc7c1.bin` i kliknij **Flash**.
 5. Alternatywa terminalowa:
-   `esptool --chip esp32s3 --port /dev/ttyACM0 write_flash 0x0 t-deck-audio-full-…bin`
+   `esptool --chip esp32s3 --port /dev/ttyACM0 write_flash 0x0 t-deck-audio-full-2.8.2.50fc7c1.bin`
 
 ### Odzyskiwanie (gdyby coś poszło nie tak)
 ESP32-S3 ma bootloader w ROM — nie da się go nadpisać zwykłym flashowaniem:
@@ -55,6 +62,11 @@ ESP32-S3 ma bootloader w ROM — nie da się go nadpisać zwykłym flashowaniem:
    partycje są identyczne, więc **klucze i konfiguracja zostają**.
 
 ### Konfiguracja (z aplikacji Meshtastic)
+> ⚠️ **Moduł głosowy jest domyślnie WYŁĄCZONY.** Po wgraniu firmware'u trzeba
+> go **włączyć w ustawieniach aplikacji** (patrz krok 3 poniżej) — dopóki
+> tego nie zrobisz, `!voice` poleci w sieć jako zwykły tekst i nic się nie
+> nagra.
+
 1. Ustaw **region** (np. EU_868) — bez regionu radio milczy.
 2. Radio → preset: **Short Slow** (zalecane; 10 s głosu ≈ 8 pakietów × ~0,23 s
    czasu antenowego — bezpiecznie w limicie duty cycle EU; na LongFast działa,
@@ -167,13 +179,20 @@ nodes route these packets like any other.
 - ❌ **T-Deck with SX1280 (2.4 GHz)** — this build targets the SX1262 variant
 
 ### Which file to flash
-| File | When | Offset |
-|---|---|---|
-| `t-deck-audio-full-2.8.2.50fc7c1.bin` | first install / full image (bootloader + partitions + app) | `0x0` |
-| `t-deck-audio-update-2.8.2.50fc7c1.bin` | update of a running node (app only) | `0x10000` |
+**This is an ALPHA build — always flash the `full` file** (bootloader + partitions + app, offset `0x0`).
+
+| File | Offset |
+|---|---|
+| `t-deck-audio-full-2.8.2.50fc7c1.bin` | `0x0` |
 
 "full" is what PlatformIO calls `factory.bin` — it does **not** mean "factory
 settings": it never touches NVS (keys, region, channels, node name survive).
+
+> 💾 **Back up your configuration BEFORE flashing!** In the Meshtastic app:
+> export/share the device configuration, or from the CLI:
+> `meshtastic --export-config config.yaml`. Keep that file — if anything goes
+> wrong you can rebuild your node (keys, channels, region) in a minute, even
+> after a full reset.
 
 ### Install — web flasher
 1. Connect the T-Deck with a **data** USB-C cable.
@@ -181,7 +200,7 @@ settings": it never touches NVS (keys, region, channels, node name survive).
 3. Pick **LILYGO T-Deck**, choose the custom firmware option and select
    `t-deck-audio-full-2.8.2.50fc7c1.bin`, then **Flash**.
 4. Terminal alternative:
-   `esptool --chip esp32s3 --port /dev/ttyACM0 write_flash 0x0 t-deck-audio-full-…bin`
+   `esptool --chip esp32s3 --port /dev/ttyACM0 write_flash 0x0 t-deck-audio-full-2.8.2.50fc7c1.bin`
 
 ### Recovery
 The ESP32-S3 boot ROM cannot be overwritten by normal flashing:
@@ -191,6 +210,10 @@ The ESP32-S3 boot ROM cannot be overwritten by normal flashing:
    partitions are identical, so **your keys and settings are kept**.
 
 ### Configuration (Meshtastic app)
+> ⚠️ **The voice module is disabled by default.** After flashing you must
+> **enable it in the app's settings** (step 3 below) — until then, `!voice`
+> goes out as a plain text message and nothing gets recorded.
+
 1. Set your **region** first.
 2. Preset: **Short Slow** recommended (10 s voice ≈ 8 packets × ~0.23 s
    airtime; LongFast works but uses ~3× the airtime).
