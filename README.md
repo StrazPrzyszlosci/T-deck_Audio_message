@@ -27,6 +27,17 @@ firmware automatycznie odtwarza wiadomość z głośnika. Bez zmian w protobufac
 - ❌ **T-Deck Max** — brak wsparcia w Meshtastic
 - ❌ **T-Deck z SX1280 (2,4 GHz)** — ten build zakłada SX1262 sub-GHz
 
+### 💾 Krok 0 — backup konfiguracji (protobufy urządzenia). ZRÓB TO NAJPIERW.
+Zanim cokolwiek wgrasz, wyeksportuj i zapisz konfigurację swojego węzła
+(protobufy: `config`, `module_config`, kanały + klucze):
+- **aplikacja Meshtastic:** ustawienia urządzenia → eksport / udostępnij
+  konfigurację (Share/Export configuration) → zapisz plik,
+- **CLI:** `meshtastic --export-config config.yaml`.
+
+Ten plik odbuduje Ci węzeł (klucze, kanały, region, nazwę) w minutę — nawet po
+pełnym restarcie fabrycznym. Flashowanie nie kasuje ustawień, ale w alfa-buildzie
+bezpieczeństwo ponad wszystko.
+
 ### Który plik wgrać
 **To build ALFA — zawsze wgraj plik `full`** (zawiera bootloader + partycje + aplikację, offset `0x0`).
 
@@ -37,12 +48,6 @@ firmware automatycznie odtwarza wiadomość z głośnika. Bez zmian w protobufac
 "full" to ta sama zawartość, którą PlatformIO nazywa `factory.bin` — **to NIE
 znaczy "ustawienia fabryczne"**: plik nie rusza NVS (klucze, region, kanały,
 nazwa węzła zostają nietknięte).
-
-> 💾 **PRZED wgraniem zrób backup konfiguracji!** W aplikacji Meshtastic:
-> eksport/udostępnij konfigurację urządzenia (Ustawienia → Export / Share
-> configuration), a z CLI: `meshtastic --export-config config.yaml`. Zapisz
-> ten plik — gdyby cokolwiek poszło nie tak, odbudujesz węzeł (klucze, kanały,
-> region) w minutę, nawet po pełnym resetzie.
 
 ### Instalacja — web flasher
 1. Podłącz T-Deck kablem USB-C **do transmisji danych**.
@@ -178,6 +183,16 @@ nodes route these packets like any other.
 - ❌ **T-Deck Max** (not supported by Meshtastic)
 - ❌ **T-Deck with SX1280 (2.4 GHz)** — this build targets the SX1262 variant
 
+### 💾 Step 0 — back up your configuration (device protobufs). DO THIS FIRST.
+Before flashing anything, export and save your node configuration
+(the protobufs: `config`, `module_config`, channels + keys):
+- **Meshtastic app:** device settings → export / share configuration,
+- **CLI:** `meshtastic --export-config config.yaml`.
+
+That file rebuilds your node (keys, channels, region, name) in a minute —
+even after a full factory reset. Flashing does not erase settings, but with
+an alpha build, better safe than sorry.
+
 ### Which file to flash
 **This is an ALPHA build — always flash the `full` file** (bootloader + partitions + app, offset `0x0`).
 
@@ -187,12 +202,6 @@ nodes route these packets like any other.
 
 "full" is what PlatformIO calls `factory.bin` — it does **not** mean "factory
 settings": it never touches NVS (keys, region, channels, node name survive).
-
-> 💾 **Back up your configuration BEFORE flashing!** In the Meshtastic app:
-> export/share the device configuration, or from the CLI:
-> `meshtastic --export-config config.yaml`. Keep that file — if anything goes
-> wrong you can rebuild your node (keys, channels, region) in a minute, even
-> after a full reset.
 
 ### Install — web flasher
 1. Connect the T-Deck with a **data** USB-C cable.
