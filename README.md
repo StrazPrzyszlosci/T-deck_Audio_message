@@ -43,7 +43,7 @@ bezpieczeństwo ponad wszystko.
 
 | Plik | Offset |
 |---|---|
-| `t-deck-audio-full-2.8.2.50fc7c1.bin` | `0x0` |
+| `t-deck-audio-full-2.8.2.ca10d3d.bin` | `0x0` |
 
 "full" to ta sama zawartość, którą PlatformIO nazywa `factory.bin` — **to NIE
 znaczy "ustawienia fabryczne"**: plik nie rusza NVS (klucze, region, kanały,
@@ -54,9 +54,9 @@ nazwa węzła zostają nietknięte).
 2. Wejdź na https://flasher.meshtastic.org
 3. Wybierz **LILYGO T-Deck**, opcję wgrywania własnego firmware
    ("Advanced / specify firmware URL" lub wybór pliku z dysku).
-4. Wskaż `t-deck-audio-full-2.8.2.50fc7c1.bin` i kliknij **Flash**.
+4. Wskaż `t-deck-audio-full-2.8.2.ca10d3d.bin` i kliknij **Flash**.
 5. Alternatywa terminalowa:
-   `esptool --chip esp32s3 --port /dev/ttyACM0 write_flash 0x0 t-deck-audio-full-2.8.2.50fc7c1.bin`
+   `esptool --chip esp32s3 --port /dev/ttyACM0 write_flash 0x0 t-deck-audio-full-2.8.2.ca10d3d.bin`
 
 ### Odzyskiwanie (gdyby coś poszło nie tak)
 ESP32-S3 ma bootloader w ROM — nie da się go nadpisać zwykłym flashowaniem:
@@ -73,13 +73,19 @@ ESP32-S3 ma bootloader w ROM — nie da się go nadpisać zwykłym flashowaniem:
 > nagra.
 
 1. Ustaw **region** (np. EU_868) — bez regionu radio milczy.
-2. Radio → preset: **Short Slow** (zalecane; 10 s głosu ≈ 8 pakietów × ~0,23 s
-   czasu antenowego — bezpiecznie w limicie duty cycle EU; na LongFast działa,
-   ale zajmuje ~3× więcej eteru).
+2. Radio → preset: **Short Slow — jedyny rozsądny preset dla głosu.**
+   10 s nagrania = ~8 pakietów ≈ **2,8–3 s airtime**. **LongFast się NIE
+   nadaje**: jeden pakiet głosowy to tam ~2,1 s czasu antenowego (~17 s na
+   10 s wiadomości) i fork ścięłby nagranie do ~2 s. **LongFast = tylko tekst,
+   nie głos.**
 3. **Module Config → Audio → Codec2: Enabled.**
 4. **Bitrate**: wybierz z natywnych trybów Codec2 — **3200 / 2400 / 1600 /
    1400 / 1300 (domyślny) / 1200 / 700C**. Zmiana działa "na żywo" (bez restartu).
    Odbiornik rozpoznaje tryb z nagłówka wiadomości — można mixować tryby.
+   **Budżet duty cycle:** fork sam pilnuje, żeby cała wiadomość nie zajęła
+   więcej niż **~6 s airtime** — przy wysokich bitrate lub wolnych presetach
+   nagranie automatycznie się skróci (przy 3200 bps na Short Slow: ~9 s,
+   na LongFast: ~2 s).
 5. Restart węzła. W logach (USB) szukaj `Voice: self-test ok` i `ES7210 mic online`.
 
 ### Użycie — komendy (wysyłane jako zwykły tekst z T-Decka lub z telefonu; komenda nigdy nie leci w eter)
@@ -198,7 +204,7 @@ an alpha build, better safe than sorry.
 
 | File | Offset |
 |---|---|
-| `t-deck-audio-full-2.8.2.50fc7c1.bin` | `0x0` |
+| `t-deck-audio-full-2.8.2.ca10d3d.bin` | `0x0` |
 
 "full" is what PlatformIO calls `factory.bin` — it does **not** mean "factory
 settings": it never touches NVS (keys, region, channels, node name survive).
@@ -207,9 +213,9 @@ settings": it never touches NVS (keys, region, channels, node name survive).
 1. Connect the T-Deck with a **data** USB-C cable.
 2. Open https://flasher.meshtastic.org
 3. Pick **LILYGO T-Deck**, choose the custom firmware option and select
-   `t-deck-audio-full-2.8.2.50fc7c1.bin`, then **Flash**.
+   `t-deck-audio-full-2.8.2.ca10d3d.bin`, then **Flash**.
 4. Terminal alternative:
-   `esptool --chip esp32s3 --port /dev/ttyACM0 write_flash 0x0 t-deck-audio-full-2.8.2.50fc7c1.bin`
+   `esptool --chip esp32s3 --port /dev/ttyACM0 write_flash 0x0 t-deck-audio-full-2.8.2.ca10d3d.bin`
 
 ### Recovery
 The ESP32-S3 boot ROM cannot be overwritten by normal flashing:
@@ -224,12 +230,18 @@ The ESP32-S3 boot ROM cannot be overwritten by normal flashing:
 > goes out as a plain text message and nothing gets recorded.
 
 1. Set your **region** first.
-2. Preset: **Short Slow** recommended (10 s voice ≈ 8 packets × ~0.23 s
-   airtime; LongFast works but uses ~3× the airtime).
+2. Preset: **Short Slow — the only sensible preset for voice.** 10 s of
+   recording = ~8 packets ≈ **2.8–3 s of airtime**. **LongFast is NOT
+   suitable**: one voice packet costs ~2.1 s of airtime there (~17 s per 10 s
+   message) and the fork would trim the recording to ~2 s. **LongFast = text
+   only, no voice.**
 3. **Module Config → Audio → Codec2: Enabled.**
 4. **Bitrate**: choose from the native Codec2 modes — **3200 / 2400 / 1600 /
    1400 / 1300 (default) / 1200 / 700C**; changes apply live (no reboot).
    The receiver reads the mode from the message header, so mixed modes work.
+   **Duty-cycle budget:** the fork keeps the whole message under **~6 s of
+   airtime** — on high bitrates or slow presets the recording shortens
+   automatically (3200 bps on Short Slow: ~9 s, on LongFast: ~2 s).
 5. Reboot and check the serial log for `Voice: self-test ok` and
    `ES7210 mic online`.
 

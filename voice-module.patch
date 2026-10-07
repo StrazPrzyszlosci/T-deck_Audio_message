@@ -1,9 +1,9 @@
 diff --git a/TDECK-VOICE-PL.md b/TDECK-VOICE-PL.md
 new file mode 100644
-index 0000000..8d5c67f
+index 0000000..c96a10e
 --- /dev/null
 +++ b/TDECK-VOICE-PL.md
-@@ -0,0 +1,106 @@
+@@ -0,0 +1,115 @@
 +# T-Deck Voice — wiadomości głosowe Codec2 1300 przez Meshtastic (fork)
 +
 +Ten fork dodaje do standardowego firmware'u Meshtastic (bazuje na `meshtastic/firmware`
@@ -26,7 +26,9 @@ index 0000000..8d5c67f
 +
 +1. **Wgraj firmware** (patrz niżej).
 +2. W aplikacji Meshtastic (Android/iOS): ustaw **region** (np. EU_868) i
-+   **preset LongFast → Short Slow**.
++   **preset LongFast → Short Slow**. **Bitrate** wybierasz z natywnych trybów
++   Codec2 (3200/2400/1600/1400/1300/1200/700C, domyślnie 1300) — zmiana
++   działa bez restartu; odbiornik rozpoznaje tryb z nagłówka.
 +3. Włącz moduł: **Module config → Audio → Codec2 enabled**. (Bitrate możesz
 +   zostawić domyślny — fork i tak wysyła 1300 b/s; czyszczenie pola OK.)
 +4. Zrestartuj węzeł. W logach szukaj linii `Voice: self-test OK` i
@@ -34,9 +36,16 @@ index 0000000..8d5c67f
 +5. Wyślij z telefonu **lub** wpisując na klawiaturze T-Decka wiadomość
 +   tekstową: `!voice` (albo `!voice 5` = 5 sekund). Komenda **nie leci w eter** —
 +   urządzenie nagrywa, a potem wysyła wiadomość głosową na ten sam kanał/do
-+   tego samego odbiorcy, do którego szła komenda.
-+6. Podczas nagrywania **dowolny klawisz przerywa** nagrywanie (i wysyła).
-+   Odebrana wiadomość odtwarza się automatycznie z głośnika.
++   tego samego odbiorcy, do którego szła komenda. Podczas nagrywania
++   **dowolny klawisz przerywa** nagrywanie (i wysyła).
++6. **PTT**: `!voice ptt` wchodzi w tryb push-to-talk na 60 s — przytrzymaj
++   **środkowy trackball** i mów (maks. 10 s, samo się wyśle), puść = wyślij.
++   Dowolny klawisz wychodzi z trybu PTT.
++7. Ustawienia (utrwalone w `/voice.cfg`): `!voice gain <0-38>` dB wzmocnienia
++   mikrofonu (skala ES7210), `!voice vol <0-16>` głośność odtwarzania,
++   `!voice log on|off` log zdarzeń, `!voice logsend` — log odsyłany jako DM
++   (dla testerów, przez Bluetooth na telefon), `!voice status`.
++   Odebrana wiadomość odtwarza się automatycznie z głośnika, jednym ciągem.
 +
 +## Kompilacja
 +
@@ -168,10 +177,10 @@ index 14db20e..3ac3391 100644
          paxcounterModule = new PaxcounterModule();
 diff --git a/src/modules/esp32/voice/VoiceModule.cpp b/src/modules/esp32/voice/VoiceModule.cpp
 new file mode 100644
-index 0000000..e3c98ad
+index 0000000..ffd73eb
 --- /dev/null
 +++ b/src/modules/esp32/voice/VoiceModule.cpp
-@@ -0,0 +1,886 @@
+@@ -0,0 +1,942 @@
 +#include "configuration.h"
 +#if defined(ARCH_ESP32) && defined(T_DECK) && !MESHTASTIC_EXCLUDE_AUDIO && !MESHTASTIC_EXCLUDE_VOICE
 +
@@ -220,22 +229,36 @@ index 0000000..e3c98ad
 +
 +static bool voiceModeGeometry(uint8_t mode, uint16_t *bits, uint16_t *samples)
 +{
++    // frame sizes per codec2.c: 3200/2400 use 20 ms (160 sample) frames,
++    // 1600/1400/1300/1200/700C use 40 ms (320 sample) frames
 +    switch (mode) {
 +    case 0: // 3200
++        *bits = 64;
++        *samples = 160;
++        return true;
 +    case 1: // 2400
++        *bits = 48;
++        *samples = 160;
++        return true;
 +    case 2: // 1600
-+    case 4: // 1300
-+    case 5: // 1200
-+        *bits = (mode == 2) ? 40 : (mode == 4) ? 52 : (mode == 0) ? 64 : 48;
++        *bits = 64;
 +        *samples = VOICE_SAMPLES_PER_FRAME_40MS;
 +        return true;
 +    case 3: // 1400
 +        *bits = 56;
 +        *samples = VOICE_SAMPLES_PER_FRAME_40MS;
 +        return true;
++    case 4: // 1300
++        *bits = 52;
++        *samples = VOICE_SAMPLES_PER_FRAME_40MS;
++        return true;
++    case 5: // 1200
++        *bits = 48;
++        *samples = VOICE_SAMPLES_PER_FRAME_40MS;
++        return true;
 +    case 8: // 700C
 +        *bits = 28;
-+        *samples = 160;
++        *samples = VOICE_SAMPLES_PER_FRAME_40MS;
 +        return true;
 +    default:
 +        return false;
@@ -720,8 +743,50 @@ index 0000000..e3c98ad
 +    return 0;
 +}
 +
++// Estimated on-air time of one voice chunk on the currently configured LoRa
++// preset (config.lora carries the real bandwidth/SF/CR the client applied).
++// Returns 0 when the radio configuration is unknown (then no cap is applied
++// and only the stock duty-cycle limiter protects the channel).
++uint16_t VoiceModule::chunkAirtimeMs()
++{
++    uint32_t bw = config.lora.bandwidth;   // kHz
++    uint32_t sf = config.lora.spread_factor;
++    uint32_t cr = config.lora.coding_rate; // 5..8 = 4/5..4/8
++    if (bw < 30 || bw > 1000 || sf < 7 || sf > 12 || cr < 5 || cr > 8)
++        return 0;
++
++    size_t pl = VOICE_HEADER_SIZE + (size_t)framesPerChunk * bitsPerFrame / 8 + VOICE_PHY_OVERHEAD_BYTES;
++    if (pl > 255)
++        pl = 255;
++
++    double symMs = (double)(1UL << sf) * 1000.0 / (double)bw;
++    double bitsPerSym = (double)sf * 4.0 / (double)cr;
++    if (symMs > 16.0)
++        bitsPerSym /= 2.0; // low data rate optimization halves payload per symbol
++    double symbols = 12.25 + 5.0 + 8.0 + ceil((8.0 * pl + 16.0) / bitsPerSym);
++    return (uint16_t)(symbols * symMs);
++}
++
 +void VoiceModule::startRecording(uint8_t seconds)
 +{
++    // duty-cycle budget: shorten the message so the total airtime of all
++    // chunks stays under ~VOICE_MAX_AIRTIME_MS on this preset
++    uint16_t airtime = chunkAirtimeMs();
++    if (airtime > 0 && airtime < VOICE_MAX_AIRTIME_MS) {
++        uint16_t maxChunks = VOICE_MAX_AIRTIME_MS / airtime;
++        if (maxChunks < 1)
++            maxChunks = 1;
++        if (maxChunks > VOICE_MAX_CHUNKS)
++            maxChunks = VOICE_MAX_CHUNKS;
++        size_t maxFrames = (size_t)maxChunks * framesPerChunk;
++        uint16_t maxSeconds = (uint16_t)((maxFrames * samplesPerFrame) / VOICE_PCM_RATE_HZ);
++        if (seconds > maxSeconds) {
++            LOG_WARN("Voice: capping %u s recording to %u s (airtime budget on this preset)", seconds, maxSeconds);
++            vlog("capped %u->%u s (airtime budget)", seconds, maxSeconds);
++            seconds = maxSeconds;
++        }
++    }
++
 +    if (!recordBuffer) {
 +        recordBuffer = (int16_t *)heap_caps_malloc(VOICE_MAX_SECONDS * VOICE_PCM_RATE_HZ * sizeof(int16_t),
 +                                                   MALLOC_CAP_SPIRAM);
@@ -1060,10 +1125,10 @@ index 0000000..e3c98ad
 +#endif
 diff --git a/src/modules/esp32/voice/VoiceModule.h b/src/modules/esp32/voice/VoiceModule.h
 new file mode 100644
-index 0000000..0caacd6
+index 0000000..4552b0c
 --- /dev/null
 +++ b/src/modules/esp32/voice/VoiceModule.h
-@@ -0,0 +1,147 @@
+@@ -0,0 +1,152 @@
 +#pragma once
 +
 +#include "configuration.h"
@@ -1098,9 +1163,13 @@ index 0000000..0caacd6
 +
 +#define VOICE_PAYLOAD_BUDGET (meshtastic_Constants_DATA_PAYLOAD_LEN - VOICE_HEADER_SIZE) // 225
 +
-+#define VOICE_MAX_CHUNKS 10
++#define VOICE_MAX_CHUNKS 20 // 3200 bps needs up to 18 chunks for 10 s on fast presets
 +#define VOICE_RX_MAX_CHUNKS 32
 +#define VOICE_TX_PACING_MS 1000 // >= 1 packet of airtime on ShortSlow per chunk
++// duty-cycle budget: the whole voice message is capped to this much channel
++// time on whatever preset is active - recordings shorten automatically
++#define VOICE_MAX_AIRTIME_MS 6000
++#define VOICE_PHY_OVERHEAD_BYTES 30 // PacketHeader + protobuf wrapper margin
 +#define VOICE_REASSEMBLY_TIMEOUT_MS 90000
 +#define VOICE_PTT_ARM_TIMEOUT_MS 60000
 +#define VOICE_TRIGGER_CMD "!voice"
@@ -1140,6 +1209,7 @@ index 0000000..0caacd6
 +    static void playbackTask(void *param);
 +
 +    void applyTxMode(uint8_t mode);
++    uint16_t chunkAirtimeMs();
 +    void sendText(const char *text, NodeNum to, uint8_t channel);
 +    void vlog(const char *format, ...);
 +    void loadSettings();
