@@ -45,6 +45,17 @@ bezpieczeństwo ponad wszystko.
 |---|---|
 | `t-deck-audio-full-2.8.2.ca10d3d.bin` | `0x0` |
 
+**Dwa buildy w repo:**
+
+| Build | Do czego | Plik |
+|---|---|---|
+| **Zwykły** | codzienne użytkowanie, bez dodatkowych logów | `t-deck-audio-full-2.8.2.ca10d3d.bin` |
+| **`-log` (testerski)** | tylko dla betatesterów: głośne logi **warstwy audio i transmisji** (`Voice:`, `TX chunk`, `RX chunk`, liczone airtime/preset, budżet duty), reszta wyciszona; marker repo w linii `S:B:` | `t-deck-audio-full-2.8.2.04de643-log.bin` |
+
+Oba pochodzą z tego samego źródła (przełączniki logowania są domyślnie
+wyłączone w zwykłym buildzie). W logu z buildu `-log` szukaj:
+`grep -E "Voice:|TX chunk|RX chunk|S:B:"`.
+
 "full" to ta sama zawartość, którą PlatformIO nazywa `factory.bin` — **to NIE
 znaczy "ustawienia fabryczne"**: plik nie rusza NVS (klucze, region, kanały,
 nazwa węzła zostają nietknięte).
@@ -205,6 +216,17 @@ an alpha build, better safe than sorry.
 | File | Offset |
 |---|---|
 | `t-deck-audio-full-2.8.2.ca10d3d.bin` | `0x0` |
+
+**Two builds in this repo:**
+
+| Build | Purpose | File |
+|---|---|---|
+| **Normal** | everyday use, no extra logging | `t-deck-audio-full-2.8.2.ca10d3d.bin` |
+| **`-log` (tester)** | beta testers only: verbose **audio-layer and transmission** logs (`Voice:`, `TX chunk`, `RX chunk`, per-preset airtime math, duty budget), everything else quieted; repo marker in the `S:B:` line | `t-deck-audio-full-2.8.2.04de643-log.bin` |
+
+Both come from the same source (the logging switches default off in the
+normal build). To filter a `-log` serial capture:
+`grep -E "Voice:|TX chunk|RX chunk|S:B:"`.
 
 "full" is what PlatformIO calls `factory.bin` — it does **not** mean "factory
 settings": it never touches NVS (keys, region, channels, node name survive).

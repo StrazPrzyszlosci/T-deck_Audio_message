@@ -119,6 +119,69 @@ index 0000000..c96a10e
 +  wyłączony (`audio.codec2_enabled`).
 +
 +Licencja vendored codec2: LGPL-2.1 (plik `LICENSE` w katalogu codec2).
+diff --git a/src/DebugConfiguration.h b/src/DebugConfiguration.h
+index b6c6da7..c46a5a7 100644
+--- a/src/DebugConfiguration.h
++++ b/src/DebugConfiguration.h
+@@ -64,8 +64,18 @@ extern MemGet memGet;
+ // "Reusing slot aged %.3fs TRACE %s"). RedirectablePrint::write() already
+ // mirrors every log character to RTT when USE_SEGGER is set.
+ #if defined(DEBUG_PORT) && !defined(DEBUG_MUTE)
++// MESHTASTIC_QUIET_LOG: diagnostic-build switch. DEBUG/INFO compile out in
++// every translation unit except radio-path ones (those define
++// MESHTASTIC_RADIO_PATH_LOG before their first include of
++// DebugConfiguration.h - see the radio/router and voice files). WARN/ERROR/CRIT
++// always stay on.
++#if defined(MESHTASTIC_QUIET_LOG) && !defined(MESHTASTIC_RADIO_PATH_LOG)
++#define LOG_DEBUG(...) ((void)0)
++#define LOG_INFO(...) ((void)0)
++#else
+ #define LOG_DEBUG(...) DEBUG_PORT.log(MESHTASTIC_LOG_LEVEL_DEBUG, __VA_ARGS__)
+ #define LOG_INFO(...) DEBUG_PORT.log(MESHTASTIC_LOG_LEVEL_INFO, __VA_ARGS__)
++#endif
+ #define LOG_WARN(...) DEBUG_PORT.log(MESHTASTIC_LOG_LEVEL_WARN, __VA_ARGS__)
+ #define LOG_ERROR(...) DEBUG_PORT.log(MESHTASTIC_LOG_LEVEL_ERROR, __VA_ARGS__)
+ #define LOG_CRIT(...) DEBUG_PORT.log(MESHTASTIC_LOG_LEVEL_CRIT, __VA_ARGS__)
+diff --git a/src/airtime.cpp b/src/airtime.cpp
+index d4a8a4c..415ad40 100644
+--- a/src/airtime.cpp
++++ b/src/airtime.cpp
+@@ -1,3 +1,5 @@
++// Radio-path file: keep LOG_DEBUG/INFO alive in MESHTASTIC_QUIET_LOG diagnostic builds.
++#define MESHTASTIC_RADIO_PATH_LOG 1
+ #include "airtime.h"
+ #include "NodeDB.h"
+ #include "UptimeClock.h"
+diff --git a/src/main.cpp b/src/main.cpp
+index 2525fcf..9e38c6f 100644
+--- a/src/main.cpp
++++ b/src/main.cpp
+@@ -363,7 +363,15 @@ void waitUntilPowerLevelSafe()
+  */
+ void printInfo()
+ {
++#if defined(MESHTASTIC_QUIET_LOG)
++    // Quiet diagnostic build: LOG_INFO is compiled out in this translation
++    // unit, so emit the structured repo/versions fingerprint line directly
++    // - logs from these builds stay attributable to this fork.
++    DEBUG_PORT.log(MESHTASTIC_LOG_LEVEL_INFO, "S:B:%d,%s,%s,%s", HW_VENDOR, optstr(APP_VERSION), optstr(APP_ENV),
++                   optstr(APP_REPO));
++#else
+     LOG_INFO("S:B:%d,%s,%s,%s", HW_VENDOR, optstr(APP_VERSION), optstr(APP_ENV), optstr(APP_REPO));
++#endif
+ }
+ #ifndef PIO_UNIT_TESTING
+ void setup()
+diff --git a/src/mesh/FloodingRouter.cpp b/src/mesh/FloodingRouter.cpp
+index 7048cd9..acec59e 100644
+--- a/src/mesh/FloodingRouter.cpp
++++ b/src/mesh/FloodingRouter.cpp
+@@ -1,3 +1,5 @@
++// Radio-path file: keep LOG_DEBUG/INFO alive in MESHTASTIC_QUIET_LOG diagnostic builds.
++#define MESHTASTIC_RADIO_PATH_LOG 1
+ #include "FloodingRouter.h"
+ #include "MeshTypes.h"
+ #include "NodeDB.h"
 diff --git a/src/mesh/MeshService.cpp b/src/mesh/MeshService.cpp
 index bcc2168..c7b7526 100644
 --- a/src/mesh/MeshService.cpp
@@ -151,6 +214,46 @@ index bcc2168..c7b7526 100644
      nodeDB->updateFrom(*p); // update our local DB for this packet (because phone might have sent position packets etc...)
  
      // callModules' loopback gate keeps RX_SRC_LOCAL packets from RoutingModule, the only module
+diff --git a/src/mesh/RadioLibInterface.cpp b/src/mesh/RadioLibInterface.cpp
+index 83fa533..55735c6 100644
+--- a/src/mesh/RadioLibInterface.cpp
++++ b/src/mesh/RadioLibInterface.cpp
+@@ -1,3 +1,5 @@
++// Radio-path file: keep LOG_DEBUG/INFO alive in MESHTASTIC_QUIET_LOG diagnostic builds.
++#define MESHTASTIC_RADIO_PATH_LOG 1
+ #include "RadioLibInterface.h"
+ #include "MeshTypes.h"
+ #include "NodeDB.h"
+diff --git a/src/mesh/ReliableRouter.cpp b/src/mesh/ReliableRouter.cpp
+index f2c71bb..e7e87f1 100644
+--- a/src/mesh/ReliableRouter.cpp
++++ b/src/mesh/ReliableRouter.cpp
+@@ -1,3 +1,5 @@
++// Radio-path file: keep LOG_DEBUG/INFO alive in MESHTASTIC_QUIET_LOG diagnostic builds.
++#define MESHTASTIC_RADIO_PATH_LOG 1
+ #include "ReliableRouter.h"
+ #include "AckProof.h"
+ #include "Default.h"
+diff --git a/src/mesh/Router.cpp b/src/mesh/Router.cpp
+index 7190e38..98b5cc7 100644
+--- a/src/mesh/Router.cpp
++++ b/src/mesh/Router.cpp
+@@ -1,3 +1,5 @@
++// Radio-path file: keep LOG_DEBUG/INFO alive in MESHTASTIC_QUIET_LOG diagnostic builds.
++#define MESHTASTIC_RADIO_PATH_LOG 1
+ #include "Router.h"
+ #include "AdminKeys.h"
+ #include "Channels.h"
+diff --git a/src/mesh/SX126xInterface.cpp b/src/mesh/SX126xInterface.cpp
+index 3ee23e8..358a641 100644
+--- a/src/mesh/SX126xInterface.cpp
++++ b/src/mesh/SX126xInterface.cpp
+@@ -1,3 +1,5 @@
++// Radio-path file: keep LOG_DEBUG/INFO alive in MESHTASTIC_QUIET_LOG diagnostic builds.
++#define MESHTASTIC_RADIO_PATH_LOG 1
+ #if RADIOLIB_EXCLUDE_SX126X != 1
+ #include "SX126xInterface.h"
+ #include "configuration.h"
 diff --git a/src/modules/Modules.cpp b/src/modules/Modules.cpp
 index 14db20e..3ac3391 100644
 --- a/src/modules/Modules.cpp
@@ -177,10 +280,12 @@ index 14db20e..3ac3391 100644
          paxcounterModule = new PaxcounterModule();
 diff --git a/src/modules/esp32/voice/VoiceModule.cpp b/src/modules/esp32/voice/VoiceModule.cpp
 new file mode 100644
-index 0000000..ffd73eb
+index 0000000..e3ddec7
 --- /dev/null
 +++ b/src/modules/esp32/voice/VoiceModule.cpp
-@@ -0,0 +1,942 @@
+@@ -0,0 +1,963 @@
++// Radio/voice-path file: keep LOG_DEBUG/INFO alive in MESHTASTIC_QUIET_LOG diagnostic builds.
++#define MESHTASTIC_RADIO_PATH_LOG 1
 +#include "configuration.h"
 +#if defined(ARCH_ESP32) && defined(T_DECK) && !MESHTASTIC_EXCLUDE_AUDIO && !MESHTASTIC_EXCLUDE_VOICE
 +
@@ -772,6 +877,10 @@ index 0000000..ffd73eb
 +    // duty-cycle budget: shorten the message so the total airtime of all
 +    // chunks stays under ~VOICE_MAX_AIRTIME_MS on this preset
 +    uint16_t airtime = chunkAirtimeMs();
++#if defined(VOICE_LOG)
++    vlog("chunk airtime ~%u ms (preset bw=%u sf=%u cr=%u), budget %u ms", airtime, config.lora.bandwidth,
++         config.lora.spread_factor, config.lora.coding_rate, VOICE_MAX_AIRTIME_MS);
++#endif
 +    if (airtime > 0 && airtime < VOICE_MAX_AIRTIME_MS) {
 +        uint16_t maxChunks = VOICE_MAX_AIRTIME_MS / airtime;
 +        if (maxChunks < 1)
@@ -860,6 +969,11 @@ index 0000000..ffd73eb
 +
 +        service->sendToMesh(p);
 +
++#if defined(VOICE_LOG)
++        vlog("TX chunk %u/%u bytes %u airtime~%u ms", (unsigned)(k + 1), (unsigned)chunkCount,
++             (unsigned)(VOICE_HEADER_SIZE + payloadBytes), chunkAirtimeMs());
++#endif
++
 +        if (k + 1 < chunkCount)
 +            vTaskDelay(pdMS_TO_TICKS(VOICE_TX_PACING_MS));
 +    }
@@ -945,6 +1059,11 @@ index 0000000..ffd73eb
 +    rxLastUpdateMs = Time::getMillis();
 +    rxDeadlineMs = rxLastUpdateMs + VOICE_REASSEMBLY_TIMEOUT_MS;
 +
++#if defined(VOICE_LOG)
++    vlog("RX chunk %u/%u mode %s mask 0x%04lx from 0x%x", chunkIdx + 1, chunkCount, modeName(rxMode),
++         (unsigned long)rxMask, from);
++#endif
++
 +    if (isLast) {
 +        rxTotalFrames = (size_t)framesPerChunk * (chunkCount - 1) + framesInChunk;
 +        rxHaveTotal = true;
@@ -992,6 +1111,11 @@ index 0000000..ffd73eb
 +            LOG_WARN("Voice: region code %d disallows audio in upstream firmware; this fork enables recorded voice "
 +                     "messages - respect local duty cycle rules",
 +                     (int)config.lora.region);
++#if defined(VOICE_LOG)
++        vlog("DIAG build %s env %s repo %s", optstr(APP_VERSION), optstr(APP_ENV), optstr(APP_REPO));
++        vlog("mode %s (%u b/frame, %u samples, %u frames/chunk), gain reg 0x%02x, vol %u/16", modeName(txMode),
++             bitsPerFrame, samplesPerFrame, framesPerChunk, micGainReg, playVolume);
++#endif
 +    }
 +
 +    // live bitrate changes from the app take effect without a reboot
@@ -17347,10 +17471,12 @@ index 0000000..75d9ecd
 +#endif //CODEC2_HAVE_VERSION
 diff --git a/src/modules/esp32/voice/tdeck_audio.cpp b/src/modules/esp32/voice/tdeck_audio.cpp
 new file mode 100644
-index 0000000..8056fcf
+index 0000000..3e1f19e
 --- /dev/null
 +++ b/src/modules/esp32/voice/tdeck_audio.cpp
-@@ -0,0 +1,256 @@
+@@ -0,0 +1,258 @@
++// Radio/voice-path file: keep LOG_DEBUG/INFO alive in MESHTASTIC_QUIET_LOG diagnostic builds.
++#define MESHTASTIC_RADIO_PATH_LOG 1
 +#include "configuration.h"
 +#if defined(ARCH_ESP32) && defined(T_DECK) && !MESHTASTIC_EXCLUDE_AUDIO && !MESHTASTIC_EXCLUDE_VOICE
 +
